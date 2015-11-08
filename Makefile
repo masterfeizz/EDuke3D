@@ -30,8 +30,8 @@ TARGET			:=	eduke3d
 BUILD			:=	output
 SOURCES			:=	build source source/jmact source/jaudiolib/src source/enet/src
 APP_AUTHOR  	:=  MasterFeizz
-APP_TITLE   	:=  eDuke3D
-APP_DESCRIPTION :=  Port of eDuke32
+APP_TITLE   	:=  EDuke3D
+APP_DESCRIPTION :=  Unofficial port of Duke Nukem 3D based on EDuke3D
 
 DATA			:=	data
 INCLUDES		:=	build/include source source/jmact source/jaudiolib/include source/enet/include
