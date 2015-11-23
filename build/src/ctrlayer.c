@@ -30,6 +30,23 @@ int32_t lockcount=0;
 // Joystick dead and saturation zones
 uint16_t *joydead, *joysatur;
 
+void Touch_TouchpadTap();
+void Touch_KeyboardTap();
+void Touch_ProcessTap();
+void Touch_DrawOverlay();
+void Touch_Init();
+void Touch_Update();
+
+u16* touchpadOverlay;
+u16* keyboardOverlay;
+char lastKey = 0;
+int tmode;
+u16* tfb;
+touchPosition oldtouch, touch;
+u64 tick;
+
+u64 lastTap = 0;
+
 int main(int argc, char **argv){
 
 	osSetSpeedupEnable(true);
@@ -46,18 +63,11 @@ int main(int argc, char **argv){
 
 	baselayer_init();
 
+    Touch_Init();
+
 	int r = app_main(argc, (const char **)argv);
 
-	while(1){
-		hidScanInput();
-		u32 kDown = hidKeysDown();
-		if (kDown & KEY_START)
-			break;
-	}
-
-	gfxExit();
-
-	return 0;
+	return r;
 }
 
 //
@@ -65,11 +75,7 @@ int main(int argc, char **argv){
 //
 int32_t initsystem(void)
 {
-
-
-    atexit(uninitsystem);
     frameplace = 0;
-
     return 0;
 }
 
@@ -81,7 +87,9 @@ void uninitsystem(void)
 {
     uninitinput();
     uninittimer();
-
+	free(framebuffer);
+    free(touchpadOverlay);
+    free(keyboardOverlay);
     gfxExit();
 }
 
@@ -182,7 +190,12 @@ int32_t initinput(void)
 
     joynumbuttons = 8;
     joynumhats = 1;
+    joynumaxes = 4;
     joyhat = (int32_t *)Bcalloc(1, sizeof(int32_t));
+
+    joyaxis = (int32_t *)Bcalloc(joynumaxes, sizeof(int32_t));
+    joydead = (uint16_t *)Bcalloc(joynumaxes, sizeof(uint16_t));
+    joysatur = (uint16_t *)Bcalloc(joynumaxes, sizeof(uint16_t));
 
     joyhat[0] = -1;
 
@@ -230,6 +243,25 @@ const char *getjoyname(int32_t what, int32_t num)
 }
 
 //
+// setjoydeadzone() -- sets the dead and saturation zones for the joystick
+//
+void setjoydeadzone(int32_t axis, uint16_t dead, uint16_t satur)
+{
+    joydead[axis] = dead;
+    joysatur[axis] = satur;
+}
+
+
+//
+// getjoydeadzone() -- gets the dead and saturation zones for the joystick
+//
+void getjoydeadzone(int32_t axis, uint16_t *dead, uint16_t *satur)
+{
+    *dead = joydead[axis];
+    *satur = joysatur[axis];
+}
+
+//
 // initmouse() -- init mouse input
 //
 int32_t initmouse(void)
@@ -270,14 +302,6 @@ void AppGrabMouse(char a)
         grabmouse(a);
         AppMouseGrab = mousegrab;
     }
-
-}
-
-//
-// setjoydeadzone() -- sets the dead and saturation zones for the joystick
-//
-void setjoydeadzone(int32_t axis, uint16_t dead, uint16_t satur)
-{
 
 }
 
@@ -334,7 +358,7 @@ void handleevents_buttons(u32 keys, int state){
     }
 
     //Buttons
-    
+
     if( keys & KEY_A)
         setkey(0, state);
     if( keys & KEY_B)
@@ -371,6 +395,28 @@ void handleevents_buttons(u32 keys, int state){
         joyhat[0] = hatvals[hatpos];
 }
 
+void handleevents_axes(void){
+    if(!joyaxis)
+        return;
+
+    circlePosition circlepad, cstick;
+
+    hidCircleRead(&circlepad);
+    hidCstickRead(&cstick);
+
+
+    joyaxis[0] =  circlepad.dx * 10;
+    joyaxis[1] =  -circlepad.dy * 20;
+    joyaxis[2] =  cstick.dx * 10;
+    joyaxis[3] =  -cstick.dy * 20;
+
+    for(int i = 0; i < 4; i++){
+        if((-joydead[i]/100 < joyaxis[i]) && (joydead[i]/100 > joyaxis[i]))
+            joyaxis[i] = 0;
+    }
+
+}
+
 
 extern void processAudio(void);
 
@@ -379,10 +425,15 @@ int32_t handleevents(void)
     hidScanInput();
     u32 kDown = hidKeysDown();
     u32 kUp = hidKeysUp();
+
     if(kDown)
         handleevents_buttons(kDown, 1);
     if(kUp)
         handleevents_buttons(kUp, 0);
+
+    handleevents_axes();
+
+    Touch_Update();
 
     sampletimer();
     return 0;
@@ -549,12 +600,10 @@ void enddrawing(void){
 //
 void showframe(int32_t w)
 {
-    UNREFERENCED_PARAMETER(w);
+	UNREFERENCED_PARAMETER(w);
+  if (offscreenrendering) return;
+  int x,y;
 
-    if (offscreenrendering) return;
-
-    fb = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-    int x,y;
 	for(x=0; x<400; x++){
 		for(y=0; y<240;y++){
 			fb[((x*240) + (239 -y))] = ctrlayer_pal[framebuffer[y*400 + x]];
@@ -577,11 +626,8 @@ void getvalidmodes(void)
 {
 
     if (modeschecked) return;
-
     validmodecnt=0;
-
     ADDMODE(400,240,8,1,-1)
-
     modeschecked=1;
 }
 
@@ -591,11 +637,8 @@ void getvalidmodes(void)
 int32_t checkvideomode(int32_t *x, int32_t *y, int32_t c, int32_t fs, int32_t forced)
 {
     int32_t i, nearest=-1, dx, dy, odx=9999, ody=9999;
-
     getvalidmodes();
-
     if ( c > 8 ) return -1;
-
     // fix up the passed resolution values to be multiples of 8
     // and at least 320x200 or at most MAXXDIMxMAXYDIM
     *x = clamp(*x, 320, MAXXDIM);
@@ -629,7 +672,6 @@ int32_t checkvideomode(int32_t *x, int32_t *y, int32_t c, int32_t fs, int32_t fo
 
     *x = validmode[nearest].xdim;
     *y = validmode[nearest].ydim;
-
     return nearest;
 }
 
@@ -646,6 +688,7 @@ int32_t setvideomode(int32_t x, int32_t y, int32_t c, int32_t fs)
     videomodereset = 0;
 
     OSD_ResizeDisplay(x, y);
+		fb = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
 
     return 0;
 }
@@ -682,4 +725,210 @@ int32_t setpalette(int32_t start, int32_t num)
 	}
 
     return 0;
+}
+
+//Im reusing most of the code from ctrQuake. This needs to be cleaned up
+
+//Touchscreen mode identifiers
+#define TMODE_TOUCHPAD 1
+#define TMODE_KEYBOARD 2
+
+//Keyboard is currently laid out on a 14*4 grid of 20px*20px boxes for lazy implementation
+char keymap[14 * 6] = {
+  sc_Escape, sc_F1, sc_F2, sc_F3, sc_F4, sc_F5, sc_F6, sc_F7, sc_F8, sc_F9, sc_F10, sc_F11, sc_F12, 0,
+  sc_Tilde, sc_1, sc_2, sc_3, sc_4, sc_5, sc_6, sc_7, sc_8, sc_9, sc_0, sc_Minus, sc_Equals, sc_BackSpace,
+  sc_Tab, sc_Q, sc_W, sc_E, sc_R, sc_T, sc_Y, sc_U, sc_I, sc_O, sc_P, sc_OpenBracket, sc_CloseBracket, sc_BackSlash,
+  0, sc_A , sc_S, sc_D, sc_F, sc_G, sc_H, sc_J, sc_K, sc_L, sc_SemiColon, sc_Quote, sc_Enter, sc_Enter,
+  sc_LeftShift, sc_Z, sc_X, sc_C, sc_V, sc_B, sc_N, sc_M, sc_Comma, sc_Period, sc_Slash, 0, sc_UpArrow, 0,
+  0, 0 , 0, 0, sc_Space, sc_Space, sc_Space, sc_Space, sc_Space, sc_Space, 0, sc_LeftArrow, sc_DownArrow, sc_RightArrow
+};
+
+char charmap[2][14 * 6] = {
+    {
+        27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        '`' , '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
+        '\t', 'q' , 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\\',
+        0, 'a' , 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '\r', '\r',
+        0, 'z' , 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0, 0, 0,
+        0, 0 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    },
+
+    {
+        27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        '`' , '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '_', '+', '\b',
+        '\t', 'q' , 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '{', '}', '|',
+        0, 'a' , 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ':', '"', '\r', '\r',
+        0, 'z' , 'x', 'c', 'v', 'b', 'n', 'm', '<', '>', '?', 0, 0, 0,
+        0, 0 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    }
+};
+
+void Touch_Init(){
+    tmode = TMODE_TOUCHPAD; //Start in touchpad Mode
+    tfb = (u16*)gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL);
+
+    //Load overlay files from sdmc for easier testing
+    FILE *texture = fopen("touchpadOverlay.bin", "rb");
+    if(!texture){
+        printf("Could not open touchpadOverlay.bin\n");
+        goto ERROR;
+    }
+    fseek(texture, 0, SEEK_END);
+    int size = ftell(texture);
+    fseek(texture, 0, SEEK_SET);
+    touchpadOverlay = malloc(size);
+    fread(touchpadOverlay, 1, size, texture);
+    fclose(texture);
+
+    texture = fopen("keyboardOverlay.bin", "rb");
+    if(!texture){
+        printf("Could not open keyboardOverlay.bin\n");
+        goto ERROR;
+    }
+    fseek(texture, 0, SEEK_END);
+    size = ftell(texture);
+    fseek(texture, 0, SEEK_SET);
+    keyboardOverlay = malloc(size);
+    fread(keyboardOverlay, 1, size, texture);
+    fclose(texture);
+
+    return;
+
+    ERROR:
+    printf("Press START to exit\n");
+    while(1){
+        hidScanInput();
+        uint32_t kDown = hidKeysDown();
+        if (kDown & KEY_START)
+            break;
+    }
+    gfxExit();
+    exit(1);
+}
+
+void Touch_TouchpadUpdate(){
+    if(hidKeysDown() & KEY_TOUCH){
+        hidTouchRead(&oldtouch);
+    }
+
+    if(hidKeysHeld() & KEY_TOUCH){
+        hidTouchRead(&touch);
+        mousex += (touch.px - oldtouch.px)*10;
+        mousey += (touch.py - oldtouch.py)*10;
+        oldtouch = touch;
+    }
+
+    if(hidKeysUp() & KEY_TOUCH){
+        if(touch.py > 195 && touch.py < 240 && touch.px > 270 && touch.px < 320){
+            tmode = 2;
+            Touch_DrawOverlay();
+        }
+    }
+}
+
+int shiftToggle = 0;
+
+void keyEvent(char code, bool press){
+    int32_t j;
+    if ((j = OSD_HandleScanCode(code, press)) <= 0)
+    {
+        if (j == -1)  // osdkey
+            for (j = 0; j < KEYSTATUSSIZ; ++j)
+                if (GetKey(j))
+                {
+                    SetKey(j, 0);
+                    if (keypresscallback)
+                        keypresscallback(j, 0);
+                }
+    }
+
+    if (press)
+    {
+        if (!GetKey(code))
+        {
+            SetKey(code, 1);
+            if (keypresscallback)
+                keypresscallback(code, 1);
+        }
+    }
+
+    else {
+        SetKey(code, 0);
+        if (keypresscallback)
+            keypresscallback(code, 0);
+    }
+}
+void Touch_KeyboardUpdate(){
+
+    if(hidKeysUp() & KEY_TOUCH){
+        if(touch.py > 195 && touch.py < 240 && touch.px > 270 && touch.px < 320){
+            tmode = 1;
+            shiftToggle = 0;
+            keyEvent(sc_LeftShift, shiftToggle);
+            Touch_DrawOverlay();
+        }
+    }
+
+    char key = 0;
+    char charvalue = 0;
+    if(hidKeysHeld() & KEY_TOUCH){
+
+        hidTouchRead(&touch);
+        if(touch.py > 5 && touch.py < 138 && touch.px > 5 && touch.px < 315){
+            key = keymap[((touch.py - 6) / 22) * 14 + (touch.px - 6)/22];
+            charvalue = charmap[shiftToggle][((touch.py - 6) / 22) * 14 + (touch.px - 6)/22];
+        }
+    }
+
+    if(lastKey != key){
+        keyEvent(lastKey, 0);
+        lastKey = 0;
+    }
+
+    if(key == sc_LeftShift && lastKey != key){
+      shiftToggle = !shiftToggle;
+      keyEvent(key, shiftToggle);
+      Touch_DrawOverlay();
+    }
+
+    else if(key !=0 && lastKey != key){
+        if (OSD_HandleChar(charvalue))
+            keyascfifo_insert(charvalue);
+
+        keyEvent(key, true);
+        lastKey = key;
+    }
+}
+
+void Touch_Update(){
+    if(tmode == TMODE_TOUCHPAD)
+        Touch_TouchpadUpdate();
+    else
+        Touch_KeyboardUpdate();
+}
+
+void Touch_DrawOverlay(){
+    u16* overlay = 0;
+    if(tmode == TMODE_TOUCHPAD)
+        overlay = touchpadOverlay;
+    else
+        overlay = keyboardOverlay;
+
+    if(!overlay) return;
+  
+    int x,y;
+
+    for(x=0; x<320; x++){
+        for(y=0; y<240;y++){
+            tfb[(x*240 + (239 - y))] = overlay[(y*320 + x)];
+        }
+    }
+
+    if(tmode == TMODE_KEYBOARD && shiftToggle == 1){
+        for(x=20; x<24; x++){
+            for(y=98; y<102;y++){
+                tfb[(x*240 + (239 - y))] = RGB8_to_565(0,255,0);
+            }
+        }
+    }
 }

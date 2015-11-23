@@ -57,8 +57,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #define MIX_VOLUME(volume) ((max(0, min((volume), 255)) * (MV_MAXVOLUME + 1)) >> 8)
 
-#define MV_MIXBUFFERSIZE     256
-#define MV_NUMBEROFBUFFERS   16
+#ifdef _3DS
+    #define MV_MIXBUFFERSIZE     1024
+    #define MV_NUMBEROFBUFFERS   8
+#else
+    #define MV_MIXBUFFERSIZE     256
+    #define MV_NUMBEROFBUFFERS   16
+#endif
 #define MV_TOTALBUFFERSIZE   ( MV_MIXBUFFERSIZE * MV_NUMBEROFBUFFERS )
 
 //#define PI                3.1415926536

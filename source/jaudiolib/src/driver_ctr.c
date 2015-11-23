@@ -19,7 +19,7 @@
  */
 
 
- /* Everything in here must be redone, this is just a duct tape solution and should be destroyed as soon as possible*/
+ /* Fixes needed */
 
 #include <3ds.h>
 #include "inttypes.h"
@@ -28,19 +28,24 @@
 # define UNREFERENCED_PARAMETER(x) x=x
 #endif
 
+#define TICKS_PER_SEC 268111856LL
+
 static int32_t Mixrate;
 static int32_t Initialized = 0;
 static int32_t Playing = 0;
 static int32_t nSamples = 0;
-static int32_t delay = 550000;
+static int32_t delay = 4;
+static uint64_t initialtick;
+static uint64_t nextupdate;
 
 void ( *MixCallBack )( void ) = 0;
 
 uint64_t lastMix =0;
+CSND_ChnInfo chninfo;
 
 void processAudio(void){
-    if(MixCallBack != 0  && (svcGetSystemTick() - lastMix > delay )){
-        lastMix = svcGetSystemTick();
+    if(MixCallBack != 0  && (svcGetSystemTick() > nextupdate)){
+        nextupdate += (2048*4*nSamples);
         MixCallBack();
     }
 }
@@ -67,7 +72,7 @@ int32_t CTRDrv_PCM_Init(int32_t *mixrate, int32_t *numchannels, void * initdata)
     APT_CheckNew3DS(&isN3DS);
 
     if(isN3DS)
-        delay = 2200000;
+        delay = 4;
 
     UNREFERENCED_PARAMETER(numchannels);
     UNREFERENCED_PARAMETER(initdata);
@@ -95,7 +100,11 @@ int32_t CTRDrv_PCM_BeginPlayback(char *BufferStart, int32_t BufferSize,
 
     nSamples = BufferSize/2;
 
+    initialtick = svcGetSystemTick();
+    nextupdate = initialtick + (2048*4*nSamples);
     csndPlaySound(0x10, SOUND_REPEAT | SOUND_FORMAT_16BIT, Mixrate, 0.75f, 0.0f, (u32*)BufferStart, (u32*)BufferStart, BufferSize*NumDivisions);
+
+    MixCallBack();
     UNREFERENCED_PARAMETER(NumDivisions);
     
     return 0;

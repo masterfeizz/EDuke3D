@@ -1010,7 +1010,7 @@ int32_t MV_Shutdown(void)
 
     // Free any voices we allocated
     #ifdef _3DS
-    linearFree(&MV_Voices);
+    linearFree(MV_Voices);
     #else
     ALIGNED_FREE_AND_NULL(MV_Voices);
     #endif

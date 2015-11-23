@@ -3005,7 +3005,6 @@ void G_GameExit(const char *msg)
     }
 
     Bfflush(NULL);
-
     exit(0);
 }
 
@@ -11884,6 +11883,11 @@ int32_t app_main(int32_t argc, const char **argv)
     FX_StopAllSounds();
     S_ClearSoundLocks();
 
+    #ifdef _3DS
+    consoleSetWindow(NULL, 0, 0, 0, 0);
+    Touch_DrawOverlay(); 
+    #endif
+
     //    getpackets();
 
 MAIN_LOOP_RESTART:
@@ -11962,6 +11966,7 @@ MAIN_LOOP_RESTART:
 
     do //main loop
     {
+
         static uint32_t nextrender = 0, framewaiting = 0;
         uint32_t j;
 
@@ -12116,7 +12121,11 @@ skipframe:
         if (g_player[myconnectindex].ps->gm&MODE_DEMO)
             goto MAIN_LOOP_RESTART;
     }
+    #ifdef _3DS
+    while(aptMainLoop());
+    #else
     while (1);
+    #endif
 
     G_GameExit(" ");
     return 0;  // not reached (duh)

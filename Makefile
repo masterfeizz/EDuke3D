@@ -45,7 +45,7 @@ CFLAGS	:=	-g -Wstrict-overflow=1 -Wuninitialized -O2 -mword-relocations \
 			-fomit-frame-pointer -ffast-math \
 			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS -DNOASM -std=c99 -DNETCODE_DISABLE -DALLOCACHE_AS_MALLOC
+CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS -DNOASM -std=c99 -DNETCODE_DISABLE
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 
