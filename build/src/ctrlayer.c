@@ -76,6 +76,7 @@ int main(int argc, char **argv){
 int32_t initsystem(void)
 {
     frameplace = 0;
+    atexit(uninitsystem);
     return 0;
 }
 
@@ -87,9 +88,7 @@ void uninitsystem(void)
 {
     uninitinput();
     uninittimer();
-	free(framebuffer);
-    free(touchpadOverlay);
-    free(keyboardOverlay);
+    hidExit();
     gfxExit();
 }
 

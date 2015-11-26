@@ -41,8 +41,8 @@ INCLUDES		:=	build/include source source/jmact source/jaudiolib/include source/e
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard
 
-CFLAGS	:=	-g -Wstrict-overflow=1 -Wuninitialized -O2 -mword-relocations \
-			-fomit-frame-pointer -ffast-math \
+CFLAGS	:=	-g -Wall -O2 -mword-relocations -std=c99 \
+			-fomit-frame-pointer -ffunction-sections \
 			$(ARCH)
 
 CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS -DNOASM -std=c99 -DNETCODE_DISABLE
@@ -157,7 +157,7 @@ JAUDIO_SRC= drivers.c \
 
 
 CFILES		:=	$(BUILD_SRC) $(GAME_SRC) $(JMACT_SRC) $(JAUDIO_SRC)
-CPPFILES	:=	
+CPPFILES	:=
 SFILES		:=
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
