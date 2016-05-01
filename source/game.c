@@ -12120,6 +12120,8 @@ MAIN_LOOP_RESTART:
 skipframe:
         if (g_player[myconnectindex].ps->gm&MODE_DEMO)
             goto MAIN_LOOP_RESTART;
+
+        usleep(1000);
     }
     #ifdef _3DS
     while(aptMainLoop());

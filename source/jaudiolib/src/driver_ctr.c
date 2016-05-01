@@ -30,25 +30,39 @@
 
 #define TICKS_PER_SEC 268111856LL
 
-static int32_t Mixrate;
+static char *MixBuffer = NULL;
+static int32_t MixBufferSize = 0;
+
 static int32_t Initialized = 0;
 static int32_t Playing = 0;
 static int32_t nSamples = 0;
-static int32_t delay = 4;
-static uint64_t initialtick;
-static uint64_t nextupdate;
 
 void ( *MixCallBack )( void ) = 0;
 
 uint64_t lastMix =0;
 CSND_ChnInfo chninfo;
 
-void processAudio(void){
-    if(MixCallBack != 0  && (svcGetSystemTick() > nextupdate)){
-        nextupdate += (2048*4*nSamples);
-        MixCallBack();
+ndspWaveBuf waveBuf[2];
+uint8_t curBuffer;
+
+void callbackFunc(void *data) {
+    if(MixCallBack != 0 ){
+        if(waveBuf[curBuffer].status == NDSP_WBUF_DONE){
+            FillBuffer(waveBuf[curBuffer].data_pcm16, MixBufferSize);
+            ndspChnWaveBufAdd(0, &waveBuf[curBuffer]);
+            curBuffer = !curBuffer;
+        }
     }
 }
+
+void FillBuffer(void *audioBuffer, size_t size) {
+    if(MixCallBack == 0)
+        return;
+
+    MixCallBack();
+    memcpy(audioBuffer, MixBuffer, size);
+    DSP_FlushDataCache(audioBuffer, size);
+};
 
 int32_t CTRDrv_GetError(void)
 {
@@ -63,16 +77,17 @@ const char *CTRDrv_ErrorString( int32_t ErrorNumber )
 
 int32_t CTRDrv_PCM_Init(int32_t *mixrate, int32_t *numchannels, void * initdata)
 {
-    if(csndInit() != 0)
+    if(ndspInit() != 0)
         return;
 
-    Mixrate = *mixrate;
-    Initialized = 1;
-    int isN3DS;
-    APT_CheckNew3DS(&isN3DS);
+    ndspSetOutputMode(NDSP_OUTPUT_STEREO);
+    ndspChnSetInterp(0, NDSP_INTERP_NONE);
+    ndspSetClippingMode(NDSP_CLIP_NORMAL);
+    ndspChnSetFormat(0, NDSP_FORMAT_STEREO_PCM16);
+    ndspChnSetRate(0, 44100.0f);
+    ndspSetCallback(&callbackFunc, 0);
 
-    if(isN3DS)
-        delay = 4;
+    Initialized = 1;
 
     UNREFERENCED_PARAMETER(numchannels);
     UNREFERENCED_PARAMETER(initdata);
@@ -84,7 +99,7 @@ void CTRDrv_PCM_Shutdown(void)
     if(!Initialized)
         return;
 
-    csndExit();
+    ndspExit();
     Initialized = 0;
 }
 
@@ -94,17 +109,27 @@ int32_t CTRDrv_PCM_BeginPlayback(char *BufferStart, int32_t BufferSize,
     if(!Initialized)
         return;
 
+    MixBuffer = BufferStart;
+    MixBufferSize = BufferSize;
 
     MixCallBack = CallBackFunc;
     MixCallBack();
 
-    nSamples = BufferSize/2;
+    nSamples = BufferSize/4;
 
-    initialtick = svcGetSystemTick();
-    nextupdate = initialtick + (2048*4*nSamples);
-    csndPlaySound(0x10, SOUND_REPEAT | SOUND_FORMAT_16BIT, Mixrate, 0.75f, 0.0f, (u32*)BufferStart, (u32*)BufferStart, BufferSize*NumDivisions);
+    memset(waveBuf,0,sizeof(waveBuf));
 
-    MixCallBack();
+    waveBuf[0].data_vaddr = linearAlloc(BufferSize);
+    waveBuf[0].nsamples = nSamples;
+    waveBuf[1].data_vaddr = linearAlloc(BufferSize);
+    waveBuf[1].nsamples = nSamples;
+
+    memset(waveBuf[0].data_pcm16, 0, BufferSize);
+    memset(waveBuf[0].data_pcm16, 0, BufferSize);
+    curBuffer = 0;
+    ndspChnWaveBufAdd(0, &waveBuf[0]);
+    ndspChnWaveBufAdd(0, &waveBuf[1]);
+
     UNREFERENCED_PARAMETER(NumDivisions);
     
     return 0;
@@ -115,8 +140,10 @@ void CTRDrv_PCM_StopPlayback(void)
     if(!Initialized)
         return;
 
-    CSND_SetPlayState(0x10, 0);
-    csndExecCmds(false);
+    ndspChnWaveBufClear(0);
+    linearFree(waveBuf[0].data_vaddr);
+    linearFree(waveBuf[1].data_vaddr);
+    MixCallBack = 0;
 }
 
 void CTRDrv_PCM_Lock(void)

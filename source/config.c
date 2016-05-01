@@ -222,7 +222,7 @@ void CONFIG_SetDefaults(void)
 #elif defined __ANDROID__
     ud.config.MixRate = droidinfo.audio_sample_rate;
 #else
-    ud.config.MixRate = 32730;
+    ud.config.MixRate = 44100;
 #endif
     ud.config.MouseBias = 0;
     ud.config.MouseDeadZone = 0;
@@ -230,7 +230,7 @@ void CONFIG_SetDefaults(void)
     ud.config.MusicVolume = 100;
     g_myAimMode = g_player[0].ps->aim_mode = 1;
     ud.config.NumBits = 16;
-    ud.config.NumChannels = 1;
+    ud.config.NumChannels = 2;
     ud.config.NumVoices = 16;
     ud.config.ReverseStereo = 0;
     ud.auto_run = 1;

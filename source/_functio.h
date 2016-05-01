@@ -302,7 +302,48 @@ static const char * joystickanalogdefaults[MAXJOYAXES] =
 static const char * joystickdigitaldefaults[MAXJOYDIGITAL] =
    {
    };
+
+#elif defined(_3DS)
+static const char * joystickdefaults[MAXJOYBUTTONSANDHATS] =
+   {
+   "Jump", // A
+   "Crouch", // B
+   "Quick_Kick", // 1
+   "Open", // 2
+   "Strafe", // -
+   "Fire", // +
+   "", // Home
+   "", // Z
+   };
+
+
+static const char * joystickclickeddefaults[MAXJOYBUTTONSANDHATS] =
+   {
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   };
+
+
+static const char * joystickanalogdefaults[MAXJOYAXES] =
+   {
+   "analog_strafing",
+   "analog_moving",
+   "analog_turning",
+   "analog_lookingupanddown",
+   };
+
+
+static const char * joystickdigitaldefaults[MAXJOYDIGITAL] =
+   {
+   };
 #else
+
 static const char * joystickdefaults[MAXJOYBUTTONSANDHATS] =
    {
    "Fire",

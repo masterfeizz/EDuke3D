@@ -37,16 +37,6 @@ void Touch_DrawOverlay();
 void Touch_Init();
 void Touch_Update();
 
-u16* touchpadOverlay;
-u16* keyboardOverlay;
-char lastKey = 0;
-int tmode;
-u16* tfb;
-touchPosition oldtouch, touch;
-u64 tick;
-
-u64 lastTap = 0;
-
 int main(int argc, char **argv){
 
 	osSetSpeedupEnable(true);
@@ -54,7 +44,6 @@ int main(int argc, char **argv){
 	gfxSetDoubleBuffering(GFX_TOP, false);
 	gfxSetDoubleBuffering(GFX_BOTTOM, false);
 	gfxSet3D(false);
-	hidInit();
 	consoleInit(GFX_BOTTOM, NULL);
 
 	framebuffer = malloc(  400 * 240 );
@@ -88,7 +77,6 @@ void uninitsystem(void)
 {
     uninitinput();
     uninittimer();
-    hidExit();
     gfxExit();
 }
 
@@ -187,7 +175,7 @@ int32_t initinput(void)
 
     memset(key_names, 0, sizeof(key_names));
 
-    joynumbuttons = 8;
+    joynumbuttons = 13;
     joynumhats = 1;
     joynumaxes = 4;
     joyhat = (int32_t *)Bcalloc(1, sizeof(int32_t));
@@ -209,9 +197,9 @@ void uninitinput(void)
     uninitmouse();
 }
 
-static const char *joynames[8] =
+static const char *joynames[13] =
 {
-    "A", "B", "X", "Y", "L", "R", "ZL", "ZR"
+    "A", "B", "X", "Y", "L", "R", "ZL", "ZR", "T1", "T2", "T3", "T4", "T5"
 };
 
 const char *getjoyname(int32_t what, int32_t num)
@@ -416,9 +404,6 @@ void handleevents_axes(void){
 
 }
 
-
-extern void processAudio(void);
-
 int32_t handleevents(void)
 {
     hidScanInput();
@@ -497,9 +482,6 @@ void uninittimer(void)
 //
 void sampletimer(void)
 {
-
-    processAudio(); //This need to be fixed -- see driver_ctr.c for more info
-
     uint64_t i;
     int32_t n;
 
@@ -726,7 +708,19 @@ int32_t setpalette(int32_t start, int32_t num)
     return 0;
 }
 
+//Touchscreen Overlay section
 //Im reusing most of the code from ctrQuake. This needs to be cleaned up
+
+u16* touchpadOverlay;
+u16* keyboardOverlay;
+char lastKey = 0;
+char lastButton = 0;
+int tmode;
+u16* tfb;
+touchPosition oldtouch, touch;
+u64 tick;
+
+u64 lastTap = 0;
 
 //Touchscreen mode identifiers
 #define TMODE_TOUCHPAD 1
@@ -749,7 +743,7 @@ char charmap[2][14 * 6] = {
         '\t', 'q' , 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\\',
         0, 'a' , 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '\r', '\r',
         0, 'z' , 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0, 0, 0,
-        0, 0 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        0, 0 , 0, 0, ' ', ' ', ' ', ' ', ' ', ' ', 0, 0, 0, 0
     },
 
     {
@@ -758,7 +752,7 @@ char charmap[2][14 * 6] = {
         '\t', 'q' , 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '{', '}', '|',
         0, 'a' , 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ':', '"', '\r', '\r',
         0, 'z' , 'x', 'c', 'v', 'b', 'n', 'm', '<', '>', '?', 0, 0, 0,
-        0, 0 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        0, 0 , 0, 0, ' ', ' ', ' ', ' ', ' ', ' ', 0, 0, 0, 0
     }
 };
 
@@ -812,13 +806,28 @@ void Touch_TouchpadUpdate(){
 
     if(hidKeysHeld() & KEY_TOUCH){
         hidTouchRead(&touch);
-        mousex += (touch.px - oldtouch.px)*10;
-        mousey += (touch.py - oldtouch.py)*10;
-        oldtouch = touch;
+        if(touch.px > 274 && touch.py < 212) {
+            char bt = (touch.py / 42) + 8;
+            if(lastButton != bt) {
+                if(lastButton)
+                    setkey(lastButton, 0);
+
+                setkey(bt, 1);
+                lastButton = bt;
+            } 
+        } else {
+            mousex += (touch.px - oldtouch.px)*10;
+            mousey += (touch.py - oldtouch.py)*10;
+            oldtouch = touch;
+        }
     }
 
     if(hidKeysUp() & KEY_TOUCH){
-        if(touch.py > 195 && touch.py < 240 && touch.px > 270 && touch.px < 320){
+        if(lastButton){
+            setkey(lastButton, 0);
+            lastButton = 0;
+        }
+        if(touch.py > 222 && touch.py < 240 && touch.px > 144 && touch.px < 175){
             tmode = 2;
             Touch_DrawOverlay();
         }
@@ -860,7 +869,7 @@ void keyEvent(char code, bool press){
 void Touch_KeyboardUpdate(){
 
     if(hidKeysUp() & KEY_TOUCH){
-        if(touch.py > 195 && touch.py < 240 && touch.px > 270 && touch.px < 320){
+        if(touch.py > 222 && touch.py < 240 && touch.px > 144 && touch.px < 175){
             tmode = 1;
             shiftToggle = 0;
             keyEvent(sc_LeftShift, shiftToggle);
@@ -873,9 +882,9 @@ void Touch_KeyboardUpdate(){
     if(hidKeysHeld() & KEY_TOUCH){
 
         hidTouchRead(&touch);
-        if(touch.py > 5 && touch.py < 138 && touch.px > 5 && touch.px < 315){
-            key = keymap[((touch.py - 6) / 22) * 14 + (touch.px - 6)/22];
-            charvalue = charmap[shiftToggle][((touch.py - 6) / 22) * 14 + (touch.px - 6)/22];
+        if(touch.py > 62 && touch.py < 188 && touch.px > 12 && touch.px < 308){
+            key = keymap[((touch.py - 62)/21) * 14 + (touch.px - 12)/21];
+            charvalue = charmap[shiftToggle][((touch.py - 62) / 21) * 14 + (touch.px - 12)/21];
         }
     }
 

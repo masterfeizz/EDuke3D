@@ -8,8 +8,8 @@ Too many things to list
 Felipe Izzo (MasterFeizz) - Main developer
 
 ## Thanks to
-3D Realms - Duke Nuke 3D
+3D Realms - Duke Nukem 3D
 
 Everyone involved in the EDuke32 project
 
-Smealum - ctrulib
+Smealum and everyone involved in the development of ctrulib

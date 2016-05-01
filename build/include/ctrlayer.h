@@ -6,7 +6,7 @@
 
 static inline void idle(void)
 {
-    svcSleepThread(1000000);
+    svcSleepThread(10000);
 }
 
 #endif // build_interface_layer_
