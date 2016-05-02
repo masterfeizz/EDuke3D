@@ -42,17 +42,17 @@ INCLUDES		:=	build/include source source/jmact source/jaudiolib/include source/e
 ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard
 
 CFLAGS	:=	-g -Wall -O2 -mword-relocations -std=c99 \
-			-fomit-frame-pointer -ffunction-sections -ffast-math \
-			$(ARCH) -DHAVE_VORBIS
+			-fomit-frame-pointer -ffunction-sections \
+			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS -DNOASM -std=c99 -DNETCODE_DISABLE
+CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS -DNOASM -std=c99 -DNETCODE_DISABLE -DHAVE_VORBIS
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:=  -lctru -lm -lvorbisfile -lvorbis -logg -lm
+LIBS	:=  -lctru -lm -lvorbisidec -logg -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

@@ -39,7 +39,7 @@
 
 #if defined __APPLE__
 # include <vorbis/vorbisfile.h>
-#elif defined GEKKO
+#elif defined (GEKKO) || defined (_3DS)
 # define USING_TREMOR
 # include <tremor/ivorbisfile.h>
 #else

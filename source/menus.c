@@ -2958,7 +2958,11 @@ static void M_MenuEntryStringActivate(/*MenuEntry_t *entry*/)
     {
     case MENU_SAVE:
         if (!save_xxh)
+            #ifdef _3DS
+            save_xxh = 1; //Dirty, dirty hack...
+            #else
             save_xxh = XXH32((uint8_t *)&ud.savegame[M_SAVE.currentEntry][0], 19, 0xDEADBEEF);
+            #endif
         if (ud.savegame[M_SAVE.currentEntry][0])
             M_ChangeMenu(MENU_SAVEVERIFY);
         break;
