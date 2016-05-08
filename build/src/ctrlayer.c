@@ -37,6 +37,21 @@ void Touch_DrawOverlay();
 void Touch_Init();
 void Touch_Update();
 
+static aptHookCookie sysAptCookie;
+
+//Used to properly exit the game when closing it from the home menu
+static void sysAptHook(APT_HookType hook, void* param)
+{
+    switch (hook)
+    {
+        case APTHOOK_ONEXIT:
+            G_Shutdown();
+            break;
+        default:
+            break;
+    }
+}
+
 int main(int argc, char **argv){
 
 	osSetSpeedupEnable(true);
@@ -46,6 +61,19 @@ int main(int argc, char **argv){
 	gfxSet3D(false);
 	consoleInit(GFX_BOTTOM, NULL);
 
+    #ifdef _3DS_CIA
+        if(chdir("sdmc:/3ds/eduke3d") != 0){
+            while(1){
+                hidScanInput();
+                uint32_t kDown = hidKeysDown();
+                if (kDown & KEY_START)
+                    break;
+                }
+            gfxExit();
+            exit(1);
+        }
+    #endif
+
 	framebuffer = malloc(  400 * 240 );
 
 	fb = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
@@ -53,6 +81,8 @@ int main(int argc, char **argv){
 	baselayer_init();
 
     Touch_Init();
+
+    aptHook(&sysAptCookie, sysAptHook, NULL);
 
 	int r = app_main(argc, (const char **)argv);
 
@@ -65,7 +95,6 @@ int main(int argc, char **argv){
 int32_t initsystem(void)
 {
     frameplace = 0;
-    atexit(uninitsystem);
     return 0;
 }
 
@@ -494,8 +523,8 @@ void sampletimer(void)
     totalclock += n;
     timerlastsample += n;
 
-    //if (usertimercallback)
-    //    for (; n > 0; n--) usertimercallback();
+    if (usertimercallback)
+        for (; n > 0; n--) usertimercallback();
 }
 
 //
@@ -560,36 +589,34 @@ void resetvideomode(void)
 void begindrawing(void)
 {
 
-    //if (offscreenrendering) return;
+    if (offscreenrendering) return;
 
     frameplace = (intptr_t)framebuffer;
     //printf("Begin Drawing");
-    bytesperline = 400;
-    calc_ylookup(bytesperline, 240);
-
-    modechange=0;
+    if(modechange){
+        calc_ylookup(400, 240);
+        modechange=0;
+    }
 }
 
 // enddrawing()
 
 void enddrawing(void){
-	//printf("End Drawing\n");
-
 }
 //
 // showframe() -- update the display
 //
 void showframe(int32_t w)
 {
-	UNREFERENCED_PARAMETER(w);
+    UNREFERENCED_PARAMETER(w);
   if (offscreenrendering) return;
   int x,y;
 
-	for(x=0; x<400; x++){
-		for(y=0; y<240;y++){
-			fb[((x*240) + (239 -y))] = ctrlayer_pal[framebuffer[y*400 + x]];
-		}
-	}
+    for(x=0; x<400; x++){
+        for(y=0; y<240;y++){
+            fb[((x*240) + (239 -y))] = ctrlayer_pal[framebuffer[y*400 + x]];
+        }
+    }
 }
 
 #define ADDMODE(x,y,c,f,n) if (validmodecnt<MAXVALIDMODES) { \

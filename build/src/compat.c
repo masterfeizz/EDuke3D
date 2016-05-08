@@ -783,7 +783,7 @@ uint32_t Bgetsysmemsize(void)
 
     return siz;
 #elif defined _3DS
-    return 24*1024*1024;
+    return (uint32_t)osGetMemRegionFree(MEMREGION_ALL );
 #elif (defined(_SC_PAGE_SIZE) || defined(_SC_PAGESIZE)) && defined(_SC_PHYS_PAGES) && !defined(GEKKO)
     uint32_t siz = UINT32_MAX;
     int64_t scpagesiz, scphyspages;

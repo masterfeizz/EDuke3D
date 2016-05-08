@@ -8058,19 +8058,6 @@ static void G_CheckCommandLine(int32_t argc, const char **argv)
                 continue;
             }
 
-            if (!Bstrcasecmp(c+1, "g") || !Bstrcasecmp(c+1, "grp"))
-            {
-                if (argc > i+1)
-                {
-                    G_AddGroup(argv[i+1]);
-                    COPYARG(i);
-                    COPYARG(i+1);
-                    i++;
-                }
-                i++;
-                continue;
-            }
-
             if (!Bstrcasecmp(c+1,"game_dir"))
             {
                 if (argc > i+1)
@@ -8086,6 +8073,20 @@ static void G_CheckCommandLine(int32_t argc, const char **argv)
                 i++;
                 continue;
             }
+
+            if (!Bstrcasecmp(c+1, "g") || !Bstrcasecmp(c+1, "grp"))
+            {
+                if (argc > i+1)
+                {
+                    G_AddGroup(argv[i+1]);
+                    COPYARG(i);
+                    COPYARG(i+1);
+                    i++;
+                }
+                i++;
+                continue;
+            }
+
             if (!Bstrcasecmp(c+1,"cachesize"))
             {
                 if (argc > i+1)

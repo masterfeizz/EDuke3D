@@ -356,7 +356,7 @@ int32_t S_LoadSound(uint32_t num)
     }
 
     int32_t fp;
-#if defined HAVE_FLAC || defined HAVE_VORBIS
+#if (defined HAVE_FLAC || defined HAVE_VORBIS) && !defined _3DS
     fp = S_UpgradeFormat(g_sounds[num].filename, g_loadFromGroupOnly);
     if (fp == -1)
 #endif

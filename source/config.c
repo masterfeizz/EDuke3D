@@ -243,7 +243,7 @@ void CONFIG_SetDefaults(void)
     ud.brightness = 8;
     ud.camerasprite = -1;
 
-#if defined GEKKO || defined __OPENDINGUX__
+#if defined GEKKO || defined __OPENDINGUX__ || defined _3DS
     ud.camera_time = 11;
 #elif defined(__ANDROID__)
     ud.camera_time = 7;

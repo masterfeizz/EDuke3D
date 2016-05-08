@@ -287,7 +287,7 @@ static int32_t G_CacheSound(uint32_t num)
 
     if (EDUKE32_PREDICT_FALSE(!g_sounds[num].filename)) return 0;
 
-#if defined HAVE_FLAC || defined HAVE_VORBIS
+#if ( defined HAVE_FLAC || defined HAVE_VORBIS ) && !defined (_3DS)
     fp = S_UpgradeFormat(g_sounds[num].filename, g_loadFromGroupOnly);
     if (fp == -1)
 #endif

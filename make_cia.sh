@@ -1,0 +1,1 @@
+makerom -f cia -o EDuke3D.cia -elf eduke3d.elf -rsf cia.rsf -banner banner.bnr -icon icon.bin -exefslogo -target t
